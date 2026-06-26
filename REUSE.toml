@@ -10,7 +10,6 @@ path = [
 	"NOTICE",
 	"Package.swift",
 	"README.md",
-	"Tests/LinuxMain.swift",
 	"docs/CODEOWNERS",
 	"docs/SECURITY.md",
 ]

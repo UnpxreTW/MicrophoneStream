@@ -4,15 +4,14 @@
 import PackageDescription
 
 let package = Package(
-    name: "AudioRecordTool",
+    name: "MicrophoneStream",
     defaultLocalization: "en",
-    platforms: [.iOS(.v14)],
+    platforms: [.iOS(.v14), .macOS(.v11)],
     products: [
-        .library(name: "AudioRecordTool", targets: ["AudioRecordTool"])
+        .library(name: "MicrophoneStream", targets: ["MicrophoneStream"])
     ],
     targets: [
-        .target(name: "AudioRecordTool", dependencies: [], swiftSettings: [.swiftLanguageMode(.v5)]),
-        .testTarget(name: "AudioRecordToolTests", dependencies: ["AudioRecordTool"], swiftSettings: [.swiftLanguageMode(.v5)]),
+        .target(name: "MicrophoneStream", dependencies: [], swiftSettings: [.swiftLanguageMode(.v6)]),
+        .testTarget(name: "MicrophoneStreamTests", dependencies: ["MicrophoneStream"], swiftSettings: [.swiftLanguageMode(.v6)]),
     ]
 )
-
