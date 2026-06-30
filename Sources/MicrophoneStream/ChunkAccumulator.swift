@@ -8,19 +8,15 @@
 
 import AVFoundation
 
-/// Slices a continuous PCM byte stream into fixed-size chunks and stamps each
-/// chunk with a host-time.
+/// 把連續的 PCM 位元組串流切成定長 chunk，並為每個 chunk 蓋上 host time 時戳。
 ///
-/// Converted audio buffers do not align to the requested chunk size, so bytes
-/// that do not fill a whole chunk are held as residual and prepended to the
-/// next input. Each emitted chunk is tagged with a host-time: the timeline is
-/// (re)anchored to the real capture time of an incoming buffer whenever the
-/// residual is empty, and advanced by exactly one chunk's duration for every
-/// chunk emitted within a buffer.
+/// 轉換後的音訊緩衝不會對齊請求的 chunk 大小，因此湊不滿一個完整 chunk 的位元組
+/// 會留作殘餘、接到下一批輸入前面。每個吐出的 chunk 都標上 host time：殘餘為空時，
+/// 時間軸（重新）錨定到進來緩衝的真實擷取時間；緩衝內每吐一個 chunk，便前進剛好
+/// 一個 chunk 的時長。
 ///
-/// - Note: Marked `@unchecked Sendable` because instances are only ever touched
-///   from the single real-time audio thread that drives the engine tap.
-///   ``append(_:hostTime:)`` must not be called concurrently.
+/// - Note: 標 `@unchecked Sendable`，因為實例只會被驅動 engine tap 的那條
+///   real-time 音訊 thread 觸碰；``append(_:hostTime:)`` 不得並行呼叫。
 final class ChunkAccumulator: @unchecked Sendable {
 
     private let chunkByteCount: Int
@@ -31,9 +27,9 @@ final class ChunkAccumulator: @unchecked Sendable {
     private var nextHostTime: UInt64 = 0
 
     /// - Parameters:
-    ///   - chunkByteCount: Bytes carried by each emitted chunk.
-    ///   - bytesPerFrame: Bytes per audio frame in the emitted format.
-    ///   - sampleRate: Sample rate of the emitted format, in hertz.
+    ///   - chunkByteCount: 每個吐出 chunk 承載的位元組數。
+    ///   - bytesPerFrame: 吐出格式中每個音訊 frame 的位元組數。
+    ///   - sampleRate: 吐出格式的取樣率（Hz）。
     init(chunkByteCount: Int, bytesPerFrame: Int, sampleRate: Double) {
         let frameBytes = max(bytesPerFrame, 1)
         self.bytesPerFrame = frameBytes
@@ -43,8 +39,8 @@ final class ChunkAccumulator: @unchecked Sendable {
         self.tickStep = AVAudioTime.hostTime(forSeconds: chunkSeconds)
     }
 
-    /// Appends `data` captured at `hostTime` and returns every whole chunk that
-    /// is now complete, oldest first. Bytes left over are retained as residual.
+    /// 接入在 `hostTime` 擷取到的 `data`，回傳此刻所有湊滿的完整 chunk，最舊的在前。
+    /// 剩下的位元組留作殘餘。
     func append(_ data: Data, hostTime: UInt64) -> [(Data, UInt64)] {
         if residual.isEmpty {
             nextHostTime = hostTime

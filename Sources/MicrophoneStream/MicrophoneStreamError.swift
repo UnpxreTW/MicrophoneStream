@@ -8,24 +8,21 @@
 
 import Foundation
 
-/// Errors thrown while starting a microphone stream.
+/// 啟動麥克風串流時擲出的錯誤。
 ///
-/// Set-up failures surface here instead of being swallowed; transient
-/// conversion failures on the real-time audio thread are logged and skipped
-/// rather than thrown, because a chunk drop must not tear down the stream.
+/// set-up 階段的失敗在此浮現、不被吞掉；real-time 音訊 thread 上的暫態轉換失敗
+/// 則記 log 後略過、而非擲出——掉一個 chunk 不該把整條串流拆掉。
 public enum MicrophoneStreamError: Error {
 
-    /// The audio session could not be configured for recording.
+    /// 音訊 session 無法配置成可錄音。
     case sessionConfigurationFailed(underlying: Error)
 
-    /// The microphone's input format was unavailable or invalid (e.g. a zero
-    /// sample rate before the session became active).
+    /// 麥克風的輸入格式不可用或無效（例如 session 尚未啟用前取樣率為零）。
     case formatUnavailable
 
-    /// No converter could be created between the input and the requested
-    /// output format.
+    /// 無法在輸入格式與請求的輸出格式之間建出轉換器。
     case converterUnavailable
 
-    /// The audio engine failed to start.
+    /// 音訊 engine 啟動失敗。
     case engineStartFailed(underlying: Error)
 }

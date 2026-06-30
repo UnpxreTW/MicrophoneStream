@@ -8,34 +8,29 @@
 
 import AVFoundation
 
-/// Describes the PCM format the microphone stream emits.
+/// 描述麥克風串流吐出的 PCM 格式。
 ///
-/// Every field is configurable; the defaults (`16 kHz / mono / signed 16-bit /
-/// 40 ms chunks`) suit speech-to-text and intercom downstreams. The captured
-/// hardware buffers are converted to this format with `AVAudioConverter`,
-/// including sample-rate conversion when ``sampleRate`` differs from the
-/// microphone's native rate.
+/// 每個欄位皆可配置；預設值（`16 kHz / mono / signed 16-bit / 40 ms chunks`）
+/// 適合語音轉文字與對講等下游。擷取到的硬體緩衝以 `AVAudioConverter`
+/// 轉成此格式，當 ``sampleRate`` 與麥克風原生取樣率不同時一併做取樣率轉換。
 public struct AudioStreamConfiguration: Sendable, Equatable {
 
-    /// Sample type of the emitted PCM (e.g. `.pcmFormatInt16`).
+    /// 吐出 PCM 的取樣型別（例如 `.pcmFormatInt16`）。
     public var commonFormat: AVAudioCommonFormat
 
-    /// Target output sample rate in hertz. `nil` follows the microphone's
-    /// native rate (no resampling).
+    /// 目標輸出取樣率（Hz）。`nil` 跟隨麥克風原生取樣率（不重新取樣）。
     public var sampleRate: Double?
 
-    /// Channel count of the emitted PCM. Multi-channel output requires
-    /// ``interleaved`` to be `true`.
+    /// 吐出 PCM 的聲道數。多聲道輸出要求 ``interleaved`` 為 `true`。
     public var channelCount: AVAudioChannelCount
 
-    /// Duration of audio carried by each emitted chunk, in seconds.
+    /// 每個吐出 chunk 承載的音訊時長（秒）。
     public var chunkDuration: TimeInterval
 
-    /// Whether multi-channel samples are interleaved in each emitted chunk.
-    /// - Note: Multi-channel output is always emitted interleaved regardless of
-    ///   this value (see ``outputFormat(inputSampleRate:)``), because the chunk
-    ///   bytes are extracted from a single packed buffer; this flag only takes
-    ///   effect for mono.
+    /// 多聲道取樣是否在每個吐出 chunk 中交錯排列。
+    /// - Note: 不論此值為何，多聲道輸出一律以交錯排列吐出
+    ///   （見 ``outputFormat(inputSampleRate:)``）——chunk 位元組是從單一打包緩衝
+    ///   抽出的，此旗標只對 mono 生效。
     public var interleaved: Bool
 
     public init(
@@ -55,12 +50,11 @@ public struct AudioStreamConfiguration: Sendable, Equatable {
     /// `16 kHz / mono / signed 16-bit / 40 ms chunks`.
     public static let `default` = AudioStreamConfiguration()
 
-    /// Builds the `AVAudioFormat` emitted by the stream, resolving a `nil`
-    /// ``sampleRate`` against the supplied hardware input rate.
+    /// 建出串流吐出的 `AVAudioFormat`，並以傳入的硬體輸入取樣率解析 `nil` 的
+    /// ``sampleRate``。
     ///
-    /// Multi-channel output is forced interleaved so the emitted chunk bytes
-    /// (extracted from a single packed buffer) carry every channel rather than
-    /// silently dropping all but channel 0.
+    /// 多聲道輸出強制交錯，讓吐出的 chunk 位元組（從單一打包緩衝抽出）承載每一個聲道，
+    /// 而非默默丟掉 channel 0 以外的全部。
     func outputFormat(inputSampleRate: Double) -> AVAudioFormat? {
         AVAudioFormat(
             commonFormat: commonFormat,
