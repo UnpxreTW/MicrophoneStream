@@ -10,9 +10,11 @@
 import AVFoundation
 import Testing
 
-@Suite("avAudioPCMBufferData") private struct AVAudioPCMBufferDataTests {
+private final class AVAudioPCMBufferDataTests {
 
-    @Test private func `Int16 取出的長度與內容正確`() {
+    /// Int16 緩衝抽出的位元組數與內容都正確。
+    @Test
+    private func `int16 pcm data has correct length and content`() {
         let format = AVAudioFormat(
             commonFormat: .pcmFormatInt16, sampleRate: 16_000, channels: 1, interleaved: true)!
         let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 4)!
@@ -27,7 +29,9 @@ import Testing
         #expect(data == expected)
     }
 
-    @Test private func `Float32 取出的長度正確`() {
+    /// Float32 緩衝抽出的位元組數正確。
+    @Test
+    private func `float32 pcm data has correct length`() {
         let format = AVAudioFormat(
             commonFormat: .pcmFormatFloat32, sampleRate: 16_000, channels: 1, interleaved: true)!
         let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 8)!
@@ -37,7 +41,9 @@ import Testing
         #expect(buffer.pcmData?.count == 8 * MemoryLayout<Float>.size)
     }
 
-    @Test private func `Int32 取出的長度正確`() {
+    /// Int32 緩衝抽出的位元組數正確。
+    @Test
+    private func `int32 pcm data has correct length`() {
         let format = AVAudioFormat(
             commonFormat: .pcmFormatInt32, sampleRate: 16_000, channels: 1, interleaved: true)!
         let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 5)!
@@ -47,7 +53,9 @@ import Testing
         #expect(buffer.pcmData?.count == 5 * MemoryLayout<Int32>.size)
     }
 
-    @Test private func `位元組長度跟隨 frameLength 而非 capacity`() {
+    /// 位元組長度依 frameLength（有效音訊）而非 frameCapacity。
+    @Test
+    private func `pcm data length follows frame length not capacity`() {
         let format = AVAudioFormat(
             commonFormat: .pcmFormatInt16, sampleRate: 16_000, channels: 1, interleaved: true)!
         let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 100)!

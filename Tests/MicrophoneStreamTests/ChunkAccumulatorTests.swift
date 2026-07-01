@@ -10,9 +10,11 @@
 import AVFoundation
 import Testing
 
-@Suite("chunkAccumulator") private struct ChunkAccumulatorTests {
+private final class ChunkAccumulatorTests {
 
-    @Test private func `吐出完整 chunk 並保留殘餘`() {
+    /// 吐出所有湊滿的完整 chunk；不足一整包的位元組留作殘餘、帶到下一批補滿。
+    @Test
+    private func `append emits whole chunks and carries residual`() {
         let accumulator = ChunkAccumulator(chunkByteCount: 8, bytesPerFrame: 2, sampleRate: 16_000)
 
         let first = accumulator.append(Data(count: 20), hostTime: 1_000)
@@ -25,7 +27,9 @@ import Testing
         #expect(second[0].0.count == 8)
     }
 
-    @Test private func `跨 chunk 保留位元組順序`() {
+    /// 跨 chunk 邊界時位元組順序不亂。
+    @Test
+    private func `append preserves byte order across chunks`() {
         let accumulator = ChunkAccumulator(chunkByteCount: 4, bytesPerFrame: 2, sampleRate: 8_000)
         let out = accumulator.append(Data([0, 1, 2, 3, 4, 5, 6, 7]), hostTime: 0)
         #expect(out.count == 2)
@@ -33,7 +37,9 @@ import Testing
         #expect(out[1].0 == Data([4, 5, 6, 7]))
     }
 
-    @Test private func `緩衝內 host time 依 chunk 時長前進`() {
+    /// 同一批緩衝內連續吐出的 chunk，host time 依 chunk 時長逐一前進。
+    @Test
+    private func `append advances host time by chunk duration within a buffer`() {
         let accumulator = ChunkAccumulator(chunkByteCount: 8, bytesPerFrame: 2, sampleRate: 16_000)
         let out = accumulator.append(Data(count: 24), hostTime: 5_000)
         #expect(out.count == 3)
@@ -45,7 +51,9 @@ import Testing
         #expect(out[2].1 == 5_000 &+ step &+ step)
     }
 
-    @Test private func `殘餘為空時 host time 重新錨定`() {
+    /// 殘餘為空時，host time 重新錨定到新進緩衝的擷取時間。
+    @Test
+    private func `append re-anchors host time when residual is empty`() {
         let accumulator = ChunkAccumulator(chunkByteCount: 8, bytesPerFrame: 2, sampleRate: 16_000)
         let first = accumulator.append(Data(count: 8), hostTime: 100)
         #expect(first.count == 1)          // 殘餘此刻為空
@@ -53,7 +61,9 @@ import Testing
         #expect(second[0].1 == 999)        // 重新錨定到新緩衝的時間
     }
 
-    @Test private func `不足一個 chunk 的輸入累積到湊滿`() {
+    /// 不足一個 chunk 的輸入持續累積，直到湊滿才吐出。
+    @Test
+    private func `append accumulates sub-chunk input until complete`() {
         let accumulator = ChunkAccumulator(chunkByteCount: 8, bytesPerFrame: 2, sampleRate: 16_000)
         #expect(accumulator.append(Data(count: 3), hostTime: 0).isEmpty)
         #expect(accumulator.append(Data(count: 3), hostTime: 1).isEmpty)
