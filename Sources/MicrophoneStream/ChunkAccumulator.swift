@@ -19,11 +19,19 @@ import AVFoundation
 ///   real-time 音訊 thread 觸碰；``append(_:hostTime:)`` 不得並行呼叫。
 final class ChunkAccumulator: @unchecked Sendable {
 
+    /// 每個吐出 chunk 的位元組數。
     private let chunkByteCount: Int
+
+    /// 吐出格式中每個音訊 frame 的位元組數。
     private let bytesPerFrame: Int
+
+    /// 每吐一個 chunk，host time 前進的 tick 數。
     private let tickStep: UInt64
 
+    /// 尚未湊滿一個 chunk 的殘餘位元組。
     private var residual = Data()
+
+    /// 下一個吐出 chunk 的 host time。
     private var nextHostTime: UInt64 = 0
 
     /// - Parameters:
