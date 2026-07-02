@@ -10,6 +10,9 @@ let package = Package(
     products: [
         .library(name: "MicrophoneStream", targets: ["MicrophoneStream"])
     ],
+    dependencies: [
+        .package(url: "https://github.com/UnpxreTW/SwiftStyleKit.git", from: "2.0.1"),
+    ],
     targets: [
         .target(name: "MicrophoneStream", dependencies: [], swiftSettings: [.swiftLanguageMode(.v6)]),
         .testTarget(name: "MicrophoneStreamTests", dependencies: ["MicrophoneStream"], swiftSettings: [.swiftLanguageMode(.v6)]),
