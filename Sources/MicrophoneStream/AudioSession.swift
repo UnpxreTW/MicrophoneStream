@@ -22,6 +22,7 @@ protocol AudioSessionControlling: Sendable {
 }
 
 #if os(iOS)
+
 /// iOS 上以 `AVAudioSession` 為底的 session 控制。
 struct PlatformAudioSession: AudioSessionControlling {
 
@@ -42,11 +43,16 @@ struct PlatformAudioSession: AudioSessionControlling {
 		try session.setActive(false, options: .notifyOthersOnDeactivation)
 	}
 }
+
 #else
+
 /// 給沒有 `AVAudioSession` 的平台（例如 macOS）的 no-op session 控制——這些平台上
 /// `AVAudioEngine` 不需 session 即可擷取麥克風。
 struct PlatformAudioSession: AudioSessionControlling {
+
 	func configureForRecording() throws {}
+
 	func deactivate() throws {}
 }
+
 #endif

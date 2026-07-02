@@ -9,6 +9,7 @@
 import AVFoundation
 import os.log
 
+/// 模組內部診斷日誌。
 private let logger: Logger = .init(subsystem: "MicrophoneStream", category: "StreamProducer")
 
 // MARK: - StreamProducer
@@ -43,7 +44,6 @@ final class StreamProducer: @unchecked Sendable {
 		guard let outputBuffer = AVAudioPCMBuffer(pcmFormat: outputFormat, frameCapacity: capacity) else {
 			return
 		}
-
 		var didFeed = false
 		var conversionError: NSError?
 		let status = converter.convert(to: outputBuffer, error: &conversionError) { _, inputStatus in
@@ -55,7 +55,6 @@ final class StreamProducer: @unchecked Sendable {
 			inputStatus.pointee = .haveData
 			return inputBuffer
 		}
-
 		switch status {
 		case .haveData, .inputRanDry:
 			if outputBuffer.frameLength > 0 {
@@ -72,8 +71,13 @@ final class StreamProducer: @unchecked Sendable {
 		}
 	}
 
+	/// 跨呼叫重用的格式轉換器；攜帶取樣率轉換所需的內部狀態。
 	private let converter: AVAudioConverter
+
+	/// 轉換的目標輸出格式。
 	private let outputFormat: AVAudioFormat
+
+	/// 逐緩衝回呼；收轉換完成的輸出緩衝與其 host time。
 	private let sink: @Sendable (AVAudioPCMBuffer, UInt64) -> Void
 
 }

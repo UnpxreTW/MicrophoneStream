@@ -9,6 +9,7 @@
 import AVFoundation
 import os.log
 
+/// 模組內部診斷日誌。
 private let logger: Logger = .init(subsystem: "MicrophoneStream", category: "MicrophoneStreamer")
 
 // MARK: - MicrophoneStreamer
@@ -48,7 +49,6 @@ public actor MicrophoneStreamer {
 		stop()
 		let runGeneration = claimGeneration()
 		let (stream, continuation) = AsyncStream<(Data, UInt64)>.makeStream()
-
 		do {
 			try beginStreaming(preferredFormat: nil) { outputFormat in
 				let bytesPerFrame: Int = .init(outputFormat.streamDescription.pointee.mBytesPerFrame)
@@ -69,7 +69,6 @@ public actor MicrophoneStreamer {
 			continuation.finish()
 			throw error
 		}
-
 		activeContinuation = continuation
 		continuation.onTermination = { [weak self] _ in
 			Task { await self?.stop(generation: runGeneration) }
@@ -131,14 +130,12 @@ public actor MicrophoneStreamer {
 			throw MicrophoneStreamError.sessionConfigurationFailed(underlying: error)
 		}
 		sessionActive = true
-
 		do {
 			let input = engine.inputNode
 			let inputFormat = input.outputFormat(forBus: 0)
 			guard inputFormat.sampleRate > 0 else {
 				throw MicrophoneStreamError.formatUnavailable
 			}
-
 			let outputFormat: AVAudioFormat
 			if let preferredFormat {
 				outputFormat = preferredFormat
@@ -147,24 +144,20 @@ public actor MicrophoneStreamer {
 			} else {
 				throw MicrophoneStreamError.formatUnavailable
 			}
-
 			guard let converter = AVAudioConverter(from: inputFormat, to: outputFormat) else {
 				throw MicrophoneStreamError.converterUnavailable
 			}
-
 			let producer: StreamProducer = .init(
 				converter: converter,
 				outputFormat: outputFormat,
 				sink: makeSink(outputFormat)
 			)
 			self.producer = producer
-
 			let tapBufferSize: AVAudioFrameCount = .init(max(inputFormat.sampleRate * configuration.chunkDuration, 1))
 			input.removeTap(onBus: 0)
 			input.installTap(onBus: 0, bufferSize: tapBufferSize, format: inputFormat) { buffer, when in
 				producer.process(buffer, hostTime: when.hostTime)
 			}
-
 			engine.prepare()
 			do {
 				try engine.start()
@@ -182,15 +175,25 @@ public actor MicrophoneStreamer {
 
 	// MARK: Private
 
+	/// 串流輸出格式設定。
 	private let configuration: AudioStreamConfiguration
+
+	/// 平台音訊 session 控制；測試經此接縫注入替身。
 	private let session: AudioSessionControlling
+
+	/// 擷取麥克風的 engine；每個 streamer 實例獨佔一個。
 	private let engine: AVAudioEngine = .init()
 
+	/// 目前一輪的轉換供應鏈；未在擷取時為 nil。
 	private var producer: StreamProducer?
+
+	/// 作用中串流的 continuation；teardown 時 finish 並清空。
 	private var activeContinuation: AsyncStream<(Data, UInt64)>.Continuation?
+
 	/// 單調遞增的 run id。每輪擷取各認領一個；以過期 generation
 	/// 為鍵的拆除請求會被忽略，因此遲來的串流取消無法拆掉較新的一輪。
 	private var generation: UInt64 = 0
+
 	/// 追蹤 `session.configureForRecording()` 是否已成功、且尚未由 `deactivate()`
 	/// 平衡掉，讓錯誤路徑與 `deinit` 能釋放 session。
 	private var sessionActive = false

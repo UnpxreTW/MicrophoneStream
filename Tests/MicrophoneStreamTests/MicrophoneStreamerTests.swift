@@ -22,7 +22,10 @@ final class MockAudioSession: AudioSessionControlling, @unchecked Sendable {
 		self.configureError = configureError
 	}
 
+	/// `configureForRecording()` 被呼叫的次數。
 	var configureCount: Int { lock.withLock { configureCalls } }
+
+	/// `deactivate()` 被呼叫的次數。
 	var deactivateCount: Int { lock.withLock { deactivateCalls } }
 
 	func configureForRecording() throws {
@@ -34,9 +37,16 @@ final class MockAudioSession: AudioSessionControlling, @unchecked Sendable {
 		lock.withLock { deactivateCalls += 1 }
 	}
 
+	/// 保護計數器的鎖；呼叫端可能跨執行緒觸碰。
 	private let lock = NSLock()
+
+	/// `configureForRecording()` 呼叫計數。
 	private var configureCalls = 0
+
+	/// `deactivate()` 呼叫計數。
 	private var deactivateCalls = 0
+
+	/// 預先設定的 configure 失敗；`nil` 表示成功。
 	private let configureError: Error?
 
 }
@@ -87,7 +97,6 @@ private final class MicrophoneStreamerTests {
 			commonFormat: .pcmFormatInt16, sampleRate: 16_000, channels: 1, interleaved: true
 		))
 		let converter = try #require(AVAudioConverter(from: inputFormat, to: outputFormat))
-
 		final class Collected: @unchecked Sendable {
 			let lock = NSLock()
 			var bytes = 0
@@ -99,16 +108,13 @@ private final class MicrophoneStreamerTests {
 		let producer = StreamProducer(converter: converter, outputFormat: outputFormat) { buffer, _ in
 			if let data = buffer.pcmData { collected.add(data.count) }
 		}
-
 		let input = try #require(AVAudioPCMBuffer(pcmFormat: inputFormat, frameCapacity: 4800))
 		input.frameLength = 4800
 		let samples = try #require(input.floatChannelData?[0])
 		for index in 0 ..< 4800 {
 			samples[index] = sinf(2 * .pi * 440 * Float(index) / 48_000)
 		}
-
 		producer.process(input, hostTime: 0)
-
 		let total = collected.bytes
 		#expect(total > 0, "降取樣輸出不該為空")
 		#expect(total % 2 == 0, "Int16 輸出必須是整數個 frame")
