@@ -19,49 +19,50 @@ import AVFoundation
 ///   real-time 音訊 thread 觸碰；``append(_:hostTime:)`` 不得並行呼叫。
 final class ChunkAccumulator: @unchecked Sendable {
 
-    /// 每個吐出 chunk 的位元組數。
-    private let chunkByteCount: Int
+	/// - Parameters:
+	///   - chunkByteCount: 每個吐出 chunk 承載的位元組數。
+	///   - bytesPerFrame: 吐出格式中每個音訊 frame 的位元組數。
+	///   - sampleRate: 吐出格式的取樣率（Hz）。
+	init(chunkByteCount: Int, bytesPerFrame: Int, sampleRate: Double) {
+		let frameBytes = max(bytesPerFrame, 1)
+		self.bytesPerFrame = frameBytes
+		self.chunkByteCount = max(chunkByteCount, frameBytes)
+		let framesPerChunk: Double = .init(self.chunkByteCount / frameBytes)
+		let chunkSeconds = sampleRate > 0 ? framesPerChunk / sampleRate : 0
+		self.tickStep = AVAudioTime.hostTime(forSeconds: chunkSeconds)
+	}
 
-    /// 吐出格式中每個音訊 frame 的位元組數。
-    private let bytesPerFrame: Int
+	/// 接入在 `hostTime` 擷取到的 `data`，回傳此刻所有湊滿的完整 chunk，最舊的在前。
+	/// 剩下的位元組留作殘餘。
+	func append(_ data: Data, hostTime: UInt64) -> [(Data, UInt64)] {
+		if residual.isEmpty {
+			nextHostTime = hostTime
+		}
+		residual.append(data)
 
-    /// 每吐一個 chunk，host time 前進的 tick 數。
-    private let tickStep: UInt64
+		var chunks: [(Data, UInt64)] = []
+		while residual.count >= chunkByteCount {
+			let chunk: Data = .init(residual.prefix(chunkByteCount))
+			chunks.append((chunk, nextHostTime))
+			residual.removeFirst(chunkByteCount)
+			nextHostTime = nextHostTime &+ tickStep
+		}
+		return chunks
+	}
 
-    /// 尚未湊滿一個 chunk 的殘餘位元組。
-    private var residual = Data()
+	/// 每個吐出 chunk 的位元組數。
+	private let chunkByteCount: Int
 
-    /// 下一個吐出 chunk 的 host time。
-    private var nextHostTime: UInt64 = 0
+	/// 吐出格式中每個音訊 frame 的位元組數。
+	private let bytesPerFrame: Int
 
-    /// - Parameters:
-    ///   - chunkByteCount: 每個吐出 chunk 承載的位元組數。
-    ///   - bytesPerFrame: 吐出格式中每個音訊 frame 的位元組數。
-    ///   - sampleRate: 吐出格式的取樣率（Hz）。
-    init(chunkByteCount: Int, bytesPerFrame: Int, sampleRate: Double) {
-        let frameBytes = max(bytesPerFrame, 1)
-        self.bytesPerFrame = frameBytes
-        self.chunkByteCount = max(chunkByteCount, frameBytes)
-        let framesPerChunk = Double(self.chunkByteCount / frameBytes)
-        let chunkSeconds = sampleRate > 0 ? framesPerChunk / sampleRate : 0
-        self.tickStep = AVAudioTime.hostTime(forSeconds: chunkSeconds)
-    }
+	/// 每吐一個 chunk，host time 前進的 tick 數。
+	private let tickStep: UInt64
 
-    /// 接入在 `hostTime` 擷取到的 `data`，回傳此刻所有湊滿的完整 chunk，最舊的在前。
-    /// 剩下的位元組留作殘餘。
-    func append(_ data: Data, hostTime: UInt64) -> [(Data, UInt64)] {
-        if residual.isEmpty {
-            nextHostTime = hostTime
-        }
-        residual.append(data)
+	/// 尚未湊滿一個 chunk 的殘餘位元組。
+	private var residual: Data = .init()
 
-        var chunks: [(Data, UInt64)] = []
-        while residual.count >= chunkByteCount {
-            let chunk = Data(residual.prefix(chunkByteCount))
-            chunks.append((chunk, nextHostTime))
-            residual.removeFirst(chunkByteCount)
-            nextHostTime = nextHostTime &+ tickStep
-        }
-        return chunks
-    }
+	/// 下一個吐出 chunk 的 host time。
+	private var nextHostTime: UInt64 = 0
+
 }

@@ -10,56 +10,68 @@
 import AVFoundation
 import Testing
 
+// swiftformat:disable propertyTypes
+
 private final class AVAudioPCMBufferDataTests {
 
-    /// Int16 緩衝抽出的位元組數與內容都正確。
-    @Test
-    private func `int16 pcm data has correct length and content`() {
-        let format = AVAudioFormat(
-            commonFormat: .pcmFormatInt16, sampleRate: 16_000, channels: 1, interleaved: true)!
-        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 4)!
-        buffer.frameLength = 4
-        let samples = buffer.int16ChannelData![0]
-        let values: [Int16] = [1, -2, 3, -4]
-        for (index, value) in values.enumerated() { samples[index] = value }
+	/// Int16 緩衝抽出的位元組數與內容都正確。
+	@Test
+	private func `int16 pcm data has correct length and content`() throws {
+		let format = try #require(AVAudioFormat(
+			commonFormat: .pcmFormatInt16, sampleRate: 16_000, channels: 1, interleaved: true
+		))
+		let buffer = try #require(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 4))
+		buffer.frameLength = 4
+		let samples = try #require(buffer.int16ChannelData?[0])
+		let values: [Int16] = [1, -2, 3, -4]
+		for (index, value) in values.enumerated() {
+			samples[index] = value
+		}
 
-        let data = buffer.pcmData
-        #expect(data?.count == 4 * MemoryLayout<Int16>.size)
-        let expected = values.withUnsafeBytes { Data($0) }
-        #expect(data == expected)
-    }
+		let data = buffer.pcmData
+		#expect(data?.count == 4 * MemoryLayout<Int16>.size)
+		let expected = values.withUnsafeBytes { Data($0) }
+		#expect(data == expected)
+	}
 
-    /// Float32 緩衝抽出的位元組數正確。
-    @Test
-    private func `float32 pcm data has correct length`() {
-        let format = AVAudioFormat(
-            commonFormat: .pcmFormatFloat32, sampleRate: 16_000, channels: 1, interleaved: true)!
-        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 8)!
-        buffer.frameLength = 8
-        for index in 0..<8 { buffer.floatChannelData![0][index] = Float(index) }
+	/// Float32 緩衝抽出的位元組數正確。
+	@Test
+	private func `float32 pcm data has correct length`() throws {
+		let format = try #require(AVAudioFormat(
+			commonFormat: .pcmFormatFloat32, sampleRate: 16_000, channels: 1, interleaved: true
+		))
+		let buffer = try #require(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 8))
+		buffer.frameLength = 8
+		for index in 0 ..< 8 {
+			buffer.floatChannelData?[0][index] = Float(index)
+		}
 
-        #expect(buffer.pcmData?.count == 8 * MemoryLayout<Float>.size)
-    }
+		#expect(buffer.pcmData?.count == 8 * MemoryLayout<Float>.size)
+	}
 
-    /// Int32 緩衝抽出的位元組數正確。
-    @Test
-    private func `int32 pcm data has correct length`() {
-        let format = AVAudioFormat(
-            commonFormat: .pcmFormatInt32, sampleRate: 16_000, channels: 1, interleaved: true)!
-        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 5)!
-        buffer.frameLength = 5
-        for index in 0..<5 { buffer.int32ChannelData![0][index] = Int32(index) }
+	/// Int32 緩衝抽出的位元組數正確。
+	@Test
+	private func `int32 pcm data has correct length`() throws {
+		let format = try #require(AVAudioFormat(
+			commonFormat: .pcmFormatInt32, sampleRate: 16_000, channels: 1, interleaved: true
+		))
+		let buffer = try #require(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 5))
+		buffer.frameLength = 5
+		for index in 0 ..< 5 {
+			buffer.int32ChannelData?[0][index] = Int32(index)
+		}
 
-        #expect(buffer.pcmData?.count == 5 * MemoryLayout<Int32>.size)
-    }
+		#expect(buffer.pcmData?.count == 5 * MemoryLayout<Int32>.size)
+	}
 
-    /// 位元組長度依 frameLength（有效音訊）而非 frameCapacity。
-    @Test
-    private func `pcm data length follows frame length not capacity`() {
-        let format = AVAudioFormat(
-            commonFormat: .pcmFormatInt16, sampleRate: 16_000, channels: 1, interleaved: true)!
-        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 100)!
-        buffer.frameLength = 10
-        #expect(buffer.pcmData?.count == 10 * MemoryLayout<Int16>.size)
-    }
+	/// 位元組長度依 frameLength（有效音訊）而非 frameCapacity。
+	@Test
+	private func `pcm data length follows frame length not capacity`() throws {
+		let format = try #require(AVAudioFormat(
+			commonFormat: .pcmFormatInt16, sampleRate: 16_000, channels: 1, interleaved: true
+		))
+		let buffer = try #require(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 100))
+		buffer.frameLength = 10
+		#expect(buffer.pcmData?.count == 10 * MemoryLayout<Int16>.size)
+	}
 }
