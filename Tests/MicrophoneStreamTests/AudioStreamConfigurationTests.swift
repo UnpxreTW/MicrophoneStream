@@ -52,7 +52,7 @@ private final class AudioStreamConfigurationTests {
 		#expect(format?.channelCount == 2)
 	}
 
-	/// 多聲道輸出一律強制交錯（避免抽包時丟掉 channel 0 以外的聲道）。
+	/// 多聲道輸出一律強制交錯（interleaved），避免抽包時丟掉 channel 0 以外的聲道。
 	@Test
 	private func `output format forces multichannel to interleaved`() {
 		// interleaved:false 會讓 pcmData 丟掉 channel 0 以外的全部；
