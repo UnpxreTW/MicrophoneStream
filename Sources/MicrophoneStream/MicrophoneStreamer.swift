@@ -219,5 +219,4 @@ public actor MicrophoneStreamer {
 		}
 		sessionActive = false
 	}
-
 }

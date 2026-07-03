@@ -79,5 +79,4 @@ final class StreamProducer: @unchecked Sendable {
 
 	/// 逐緩衝回呼；收轉換完成的輸出緩衝與其 host time。
 	private let sink: @Sendable (AVAudioPCMBuffer, UInt64) -> Void
-
 }

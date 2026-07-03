@@ -48,7 +48,6 @@ final class MockAudioSession: AudioSessionControlling, @unchecked Sendable {
 
 	/// 預先設定的 configure 失敗；`nil` 表示成功。
 	private let configureError: Error?
-
 }
 
 // MARK: - SessionBoom
