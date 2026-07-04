@@ -182,7 +182,11 @@ public actor MicrophoneStreamer {
 	private let session: AudioSessionControlling
 
 	/// 擷取麥克風的 engine；每個 streamer 實例獨佔一個。
-	private let engine: AVAudioEngine = .init()
+	///
+	/// 標 `nonisolated(unsafe)`：`AVAudioEngine` 非 Sendable，`deinit`（nonisolated）
+	/// 需要在最後一個參考消失時停掉它——此時已無任何並行觸碰，實際安全；
+	/// 其餘存取皆在 actor 隔離內。
+	nonisolated(unsafe) private let engine: AVAudioEngine = .init()
 
 	/// 目前一輪的轉換供應鏈；未在擷取時為 nil。
 	private var producer: StreamProducer?
