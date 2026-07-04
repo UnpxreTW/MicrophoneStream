@@ -22,5 +22,5 @@ jobs:
           xcode-version: '26.3'
       - name: swift build（macOS）
         run: swift build
-      - name: swift build（iOS Simulator）
-        run: swift build --triple arm64-apple-ios-simulator
+      - name: xcodebuild（iOS Simulator）
+        run: xcodebuild build -scheme MicrophoneStream -destination 'generic/platform=iOS Simulator'
