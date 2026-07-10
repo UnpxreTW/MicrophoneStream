@@ -38,14 +38,29 @@ public actor MicrophoneStreamer {
 		engine.inputNode.outputFormat(forBus: 0).sampleRate
 	}
 
+	/// 向系統請求麥克風使用權限；尚未決定時跳出系統對話框，回傳最終是否授與。
+	///
+	/// ``start()`` 不代為請求——未授權（含尚未決定）時直接擲出
+	/// ``MicrophoneStreamError/permissionDenied``，因此第一次擷取前先呼叫此方法。
+	/// 掛在型別而非實例上：權限是整個 process 共用的系統狀態、不屬於任一 streamer，
+	/// 呼叫端也應在建立 streamer 之前就能請求。
+	public static func requestPermission() async -> Bool {
+		await PlatformMicrophonePermission().requestPermission()
+	}
+
 	/// 啟動擷取，回傳一條 `(pcmChunk, hostTime)` 配對的串流。
 	///
 	/// 當 ``stop()`` 被呼叫、或回傳的串流被取消時，串流結束。已在執行中又呼叫
 	/// `start()` 會先停掉前一輪（其串流隨之結束）。
 	///
-	/// - Throws: 若 session、輸入格式、轉換器或 engine 無法備妥，擲出
+	/// - Throws: 麥克風權限未授與時擲出 ``MicrophoneStreamError/permissionDenied``，
+	///   不往下碰 session 與 engine——與其等 engine 層吐晦澀的原生錯誤，不如在入口
+	///   就把原因講明。「尚未決定」同樣直接擲出、不代為觸發權限請求（那會在
+	///   `start()` 內卡一個系統對話框）：先呼叫 ``requestPermission()``。其後若
+	///   session、輸入格式、轉換器或 engine 無法備妥，擲出對應的
 	///   ``MicrophoneStreamError``。
 	public func start() throws -> AsyncStream<(Data, UInt64)> {
+		guard permission.isGranted else { throw MicrophoneStreamError.permissionDenied }
 		stop()
 		let runGeneration = claimGeneration()
 		let (stream, continuation) = AsyncStream<(Data, UInt64)>.makeStream()
@@ -82,16 +97,35 @@ public actor MicrophoneStreamer {
 	}
 
 	/// 建立一個以指定格式吐出 PCM 的 streamer。
-	public init(configuration: AudioStreamConfiguration = .default) {
-		self.init(configuration: configuration, session: PlatformAudioSession())
+	///
+	/// - Parameters:
+	///   - configuration: 串流輸出的 PCM 格式設定。
+	///   - allowsBluetoothInput: 是否允許藍牙 HFP 裝置（耳機麥克風）作為錄音輸入。
+	///     走 HFP 收音會把整條藍牙連線降到電話級窄頻 codec、音質明顯劣化，
+	///     因此預設關閉，只在確實要用藍牙耳機收音時開啟。僅 iOS 生效；macOS 沒有
+	///     `AVAudioSession`，輸入路由由系統的輸入裝置選擇決定，此旗標為 no-op。
+	public init(configuration: AudioStreamConfiguration = .default, allowsBluetoothInput: Bool = false) {
+		self.init(
+			configuration: configuration,
+			allowsBluetoothInput: allowsBluetoothInput,
+			session: PlatformAudioSession(),
+			permission: PlatformMicrophonePermission()
+		)
 	}
 
 	// MARK: Lifecycle
 
-	/// 測試接縫：注入自訂的 session 控制器。
-	init(configuration: AudioStreamConfiguration = .default, session: AudioSessionControlling) {
+	/// 測試接縫：注入自訂的 session 控制器與權限控制器。
+	init(
+		configuration: AudioStreamConfiguration = .default,
+		allowsBluetoothInput: Bool = false,
+		session: AudioSessionControlling,
+		permission: MicrophonePermissionControlling
+	) {
 		self.configuration = configuration
+		self.allowsBluetoothInput = allowsBluetoothInput
 		self.session = session
+		self.permission = permission
 	}
 
 	deinit {
@@ -125,7 +159,7 @@ public actor MicrophoneStreamer {
 		makeSink: (AVAudioFormat) -> (@Sendable (AVAudioPCMBuffer, UInt64) -> Void)
 	) throws -> AVAudioFormat {
 		do {
-			try session.configureForRecording()
+			try session.configureForRecording(allowingBluetoothInput: allowsBluetoothInput)
 		} catch {
 			throw MicrophoneStreamError.sessionConfigurationFailed(underlying: error)
 		}
@@ -178,8 +212,15 @@ public actor MicrophoneStreamer {
 	/// 串流輸出格式設定。
 	private let configuration: AudioStreamConfiguration
 
+	/// 是否允許藍牙 HFP 輸入；配置 session 時原封轉送
+	/// （代價與平台差異見 ``init(configuration:allowsBluetoothInput:)``）。
+	private let allowsBluetoothInput: Bool
+
 	/// 平台音訊 session 控制；測試經此接縫注入替身。
 	private let session: AudioSessionControlling
+
+	/// 平台麥克風權限查詢；測試經此接縫注入假授權狀態。
+	private let permission: MicrophonePermissionControlling
 
 	/// 擷取麥克風的 engine；每個 streamer 實例獨佔一個。
 	///
