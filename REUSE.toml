@@ -1,5 +1,6 @@
 # REUSE 設定：批次涵蓋無法掛 inline SPDX header 的 manifest / 設定 / 文件 / 測試入口檔。
-# 已掛 header 的 .swift 原始碼不在此列；授權全文見 LICENSES/Apache-2.0.txt。
+# 已掛 header 的 .swift 原始碼不在此列（惟見下方工具限制 fallback 區塊）；
+# 授權全文見 LICENSES/Apache-2.0.txt。
 version = 1
 
 [[annotations]]
@@ -14,5 +15,15 @@ path = [
 	"docs/SECURITY.md",
 ]
 precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Unpxre (GitHub: UnpxreTW)"
+SPDX-License-Identifier = "Apache-2.0"
+
+# 工具限制 fallback：reuse（實測 6.2.0）的編碼偵測只取檔案前 2 KiB 交給
+# charset_normalizer，中文註解密集的 .swift 檔若該邊界恰好切在多位元組字元
+# 中間，整檔會被誤判為 binary、讀不到已掛的 inline header。此區塊以 closest
+# 優先權補位：檔內 header 讀得到時仍以 header 為正本。
+[[annotations]]
+path = ["Sources/**", "Tests/**"]
+precedence = "closest"
 SPDX-FileCopyrightText = "2026 Unpxre (GitHub: UnpxreTW)"
 SPDX-License-Identifier = "Apache-2.0"
