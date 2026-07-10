@@ -1,6 +1,6 @@
 # MicrophoneStream
 
-即時擷取麥克風的裸 PCM 音訊流，以 Swift `AsyncStream` 餵給下游——語音轉文字（STT）、雙向對講等即時場景。
+即時擷取麥克風的 raw PCM 音訊流，以 Swift `AsyncStream` 餵給下游——語音轉文字（STT）、雙向對講等即時場景。
 
 這不是「錄音存檔」工具：它不寫檔、不播放，只把麥克風緩衝區即時轉成你指定格式的 PCM 封包（預設 16 kHz / mono / Int16、每包 40 ms），並附上每包首個 sample 的 host-time 時戳。
 
@@ -46,6 +46,16 @@ let streamer = MicrophoneStreamer(configuration: configuration)
 - iOS 14.0+（套件亦可在 macOS 11+ 建置，session 管理為 iOS 專屬、macOS 上略過）
 - 於 `Info.plist` 宣告 `NSMicrophoneUsageDescription`
 - Swift 6 工具鏈
+
+## 開發
+
+```shell
+swift build   # macOS
+swift test    # 跑測試
+xcodebuild build -scheme MicrophoneStream -destination 'generic/platform=iOS Simulator'   # iOS Simulator
+```
+
+CI（GitHub Actions）跑上述指令，見 `.github/workflows/build.yml` 與 `test.yml`。
 
 ## 授權
 
