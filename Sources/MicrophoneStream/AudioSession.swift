@@ -15,7 +15,10 @@ import AVFoundation
 protocol AudioSessionControlling: Sendable {
 
 	/// 以可錄音的 category 啟用 session。
-	func configureForRecording() throws
+	///
+	/// - Parameter allowingBluetoothInput: 是否把藍牙 HFP 裝置納入可用的錄音輸入
+	///   （音質代價見 ``MicrophoneStreamer/init(configuration:allowsBluetoothInput:)``）。
+	func configureForRecording(allowingBluetoothInput: Bool) throws
 
 	/// 讓 session 回到預設的非作用狀態。
 	func deactivate() throws
@@ -26,13 +29,13 @@ protocol AudioSessionControlling: Sendable {
 /// iOS 上以 `AVAudioSession` 為底的 session 控制。
 struct PlatformAudioSession: AudioSessionControlling {
 
-	func configureForRecording() throws {
+	func configureForRecording(allowingBluetoothInput: Bool) throws {
 		let session: AVAudioSession = .sharedInstance()
-		try session.setCategory(
-			.playAndRecord,
-			mode: .videoRecording,
-			options: [.interruptSpokenAudioAndMixWithOthers]
-		)
+		var options: AVAudioSession.CategoryOptions = [.interruptSpokenAudioAndMixWithOthers]
+		if allowingBluetoothInput {
+			options.insert(.allowBluetoothHFP)
+		}
+		try session.setCategory(.playAndRecord, mode: .videoRecording, options: options)
 		try session.setPreferredIOBufferDuration(0.005)
 		try session.setActive(true)
 	}
@@ -47,10 +50,11 @@ struct PlatformAudioSession: AudioSessionControlling {
 #else
 
 /// 給沒有 `AVAudioSession` 的平台（例如 macOS）的 no-op session 控制——這些平台上
-/// `AVAudioEngine` 不需 session 即可擷取麥克風。
+/// `AVAudioEngine` 不需 session 即可擷取麥克風；藍牙輸入與否由系統的輸入裝置選擇
+/// 決定，`allowingBluetoothInput` 在此無事可做。
 struct PlatformAudioSession: AudioSessionControlling {
 
-	func configureForRecording() throws {}
+	func configureForRecording(allowingBluetoothInput _: Bool) throws {}
 
 	func deactivate() throws {}
 }

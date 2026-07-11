@@ -14,6 +14,12 @@ import Foundation
 /// 則記 log 後略過、而非擲出——掉一個 chunk 不該把整條串流拆掉。
 public enum MicrophoneStreamError: Error {
 
+	/// 麥克風權限未授與（含使用者尚未決定）。
+	///
+	/// ``MicrophoneStreamer/start()`` 不代為請求權限——先呼叫
+	/// ``MicrophoneStreamer/requestPermission()`` 取得授權再啟動。
+	case permissionDenied
+
 	/// 音訊 session 無法配置成可錄音。
 	case sessionConfigurationFailed(underlying: Error)
 

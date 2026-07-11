@@ -27,6 +27,25 @@ for await (pcm, hostTime) in try await streamer.start() {
 
 停止擷取呼叫 `await streamer.stop()`；消費端結束 `for await`（cancel stream）也會自動收尾。
 
+### 麥克風權限
+
+`start()` 不代為請求權限：未授權（含使用者尚未決定）直接擲出 `MicrophoneStreamError.permissionDenied`、不往下碰 engine。第一次擷取前先請求：
+
+```swift
+guard await MicrophoneStreamer.requestPermission() else {
+    // 被拒：引導使用者到系統設定開啟麥克風權限
+    return
+}
+```
+
+### 藍牙耳機收音
+
+```swift
+let streamer = MicrophoneStreamer(allowsBluetoothInput: true)
+```
+
+允許藍牙 HFP 裝置（耳機麥克風）作為錄音輸入。走 HFP 收音會把整條藍牙連線降到電話級窄頻 codec、音質明顯劣化，因此預設關閉。僅 iOS 生效；macOS 沒有 `AVAudioSession`，輸入路由由系統的輸入裝置選擇決定。
+
 ### 自訂格式
 
 ```swift

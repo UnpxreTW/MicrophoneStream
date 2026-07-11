@@ -28,8 +28,14 @@ final class MockAudioSession: AudioSessionControlling, @unchecked Sendable {
 	/// `deactivate()` 被呼叫的次數。
 	var deactivateCount: Int { lock.withLock { deactivateCalls } }
 
-	func configureForRecording() throws {
-		lock.withLock { configureCalls += 1 }
+	/// 最近一次 configure 收到的藍牙輸入旗標；尚未被呼叫過為 `nil`。
+	var lastAllowsBluetoothInput: Bool? { lock.withLock { receivedBluetoothInputFlags.last } }
+
+	func configureForRecording(allowingBluetoothInput: Bool) throws {
+		lock.withLock {
+			configureCalls += 1
+			receivedBluetoothInputFlags.append(allowingBluetoothInput)
+		}
 		if let configureError { throw configureError }
 	}
 
@@ -46,8 +52,24 @@ final class MockAudioSession: AudioSessionControlling, @unchecked Sendable {
 	/// `deactivate()` 呼叫計數。
 	private var deactivateCalls = 0
 
+	/// 每次 configure 收到的藍牙輸入旗標，依呼叫順序排列。
+	private var receivedBluetoothInputFlags: [Bool] = []
+
 	/// 預先設定的 configure 失敗；`nil` 表示成功。
 	private let configureError: Error?
+}
+
+// MARK: - MockMicrophonePermission
+
+/// 回報預設授權狀態的假權限控制器，讓 start() 的授權檢查無需真實系統權限即可測試。
+struct MockMicrophonePermission: MicrophonePermissionControlling {
+
+	/// 預先設定的授權狀態；`isGranted` 與 `requestPermission()` 皆回報此值。
+	let granted: Bool
+
+	var isGranted: Bool { granted }
+
+	func requestPermission() async -> Bool { granted }
 }
 
 // MARK: - SessionBoom
@@ -63,7 +85,11 @@ private final class MicrophoneStreamerTests {
 	@Test
 	private func `start throws session configuration failed when session fails`() async {
 		let session = MockAudioSession(configureError: SessionBoom())
-		let streamer = MicrophoneStreamer(configuration: .default, session: session)
+		let streamer = MicrophoneStreamer(
+			configuration: .default,
+			session: session,
+			permission: MockMicrophonePermission(granted: true)
+		)
 		do {
 			_ = try await streamer.start()
 			Issue.record("start() 應該要擲出")
@@ -80,9 +106,83 @@ private final class MicrophoneStreamerTests {
 	@Test
 	private func `stop when idle is safe and does not deactivate`() async {
 		let session = MockAudioSession()
-		let streamer = MicrophoneStreamer(configuration: .default, session: session)
+		let streamer = MicrophoneStreamer(
+			configuration: .default,
+			session: session,
+			permission: MockMicrophonePermission(granted: true)
+		)
 		await streamer.stop()
 		#expect(session.deactivateCount == 0)
+	}
+
+	/// 權限被拒時 start() 直接擲出 permissionDenied，且完全不碰 session——
+	/// 授權檢查在任何 session／engine 動作之前，不等 engine 層的原生錯誤。
+	@Test
+	private func `start throws permission denied when permission is not granted`() async {
+		let session = MockAudioSession()
+		let streamer = MicrophoneStreamer(
+			configuration: .default,
+			session: session,
+			permission: MockMicrophonePermission(granted: false)
+		)
+		do {
+			_ = try await streamer.start()
+			Issue.record("start() 應該要擲出")
+		} catch MicrophoneStreamError.permissionDenied {
+			// 預期路徑。
+		} catch {
+			Issue.record("非預期錯誤：\(error)")
+		}
+		#expect(session.configureCount == 0)
+	}
+
+	/// 權限已授與時 start() 照常往下走——以 session 失敗浮現
+	/// sessionConfigurationFailed 證明流程越過了授權檢查（測試不需真實麥克風）。
+	@Test
+	private func `start proceeds past permission check when permission is granted`() async {
+		let session = MockAudioSession(configureError: SessionBoom())
+		let streamer = MicrophoneStreamer(
+			configuration: .default,
+			session: session,
+			permission: MockMicrophonePermission(granted: true)
+		)
+		do {
+			_ = try await streamer.start()
+			Issue.record("start() 應該要擲出")
+		} catch MicrophoneStreamError.sessionConfigurationFailed {
+			// 預期路徑：越過授權檢查、進到 session 配置。
+		} catch {
+			Issue.record("非預期錯誤：\(error)")
+		}
+		#expect(session.configureCount == 1)
+	}
+
+	/// allowsBluetoothInput 開啟時，旗標原封轉送給 session 的 configure。
+	/// 以 configure 失敗截斷流程，讓測試停在 session 層、不觸碰真實 engine。
+	@Test
+	private func `start forwards bluetooth input preference to session`() async {
+		let session = MockAudioSession(configureError: SessionBoom())
+		let streamer = MicrophoneStreamer(
+			configuration: .default,
+			allowsBluetoothInput: true,
+			session: session,
+			permission: MockMicrophonePermission(granted: true)
+		)
+		_ = try? await streamer.start()
+		#expect(session.lastAllowsBluetoothInput == true)
+	}
+
+	/// 沒有指定 allowsBluetoothInput 時，session 收到的是預設關閉。
+	@Test
+	private func `bluetooth input defaults to disabled`() async {
+		let session = MockAudioSession(configureError: SessionBoom())
+		let streamer = MicrophoneStreamer(
+			configuration: .default,
+			session: session,
+			permission: MockMicrophonePermission(granted: true)
+		)
+		_ = try? await streamer.start()
+		#expect(session.lastAllowsBluetoothInput == false)
 	}
 
 	/// 不靠麥克風、用合成輸入緩衝驅動 `StreamProducer`，端到端走一遍轉換路徑
