@@ -35,6 +35,9 @@ struct PlatformAudioSession: AudioSessionControlling {
 		if allowingBluetoothInput {
 			options.insert(.allowBluetoothHFP)
 		}
+		// 選用 .videoRecording、非 .voiceChat：.voiceChat 會依官方行為套用 AGC／
+		// 回音消除／降噪等語音優化處理，不適合本套件「原始麥克風 PCM」的定位；
+		// .videoRecording 避開這條語音優化路徑。
 		try session.setCategory(.playAndRecord, mode: .videoRecording, options: options)
 		try session.setPreferredIOBufferDuration(0.005)
 		try session.setActive(true)
