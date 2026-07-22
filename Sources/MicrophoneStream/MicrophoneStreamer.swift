@@ -53,6 +53,12 @@ public actor MicrophoneStreamer {
 	/// 當 ``stop()`` 被呼叫、或回傳的串流被取消時，串流結束。已在執行中又呼叫
 	/// `start()` 會先停掉前一輪（其串流隨之結束）。
 	///
+	/// 回傳的串流不限制緩衝：麥克風以穩定速率即時產出 chunk，若 consumer 處理跟不上，
+	/// 尚未被消費的 chunk 會持續在串流內部堆積、不會被丟棄。這是刻意的「不丟資料」
+	/// 取捨——寧可讓記憶體隨落後幅度增長，也不要在 consumer 一時沒空時默默漏包。
+	/// 若呼叫端預期 consumer 可能長時間落後（例如下游做重運算），應自行節流或限流，
+	/// 不要依賴串流內部丟包。
+	///
 	/// - Throws: 麥克風權限未授與時擲出 ``MicrophoneStreamError/permissionDenied``，
 	///   不往下碰 session 與 engine——與其等 engine 層吐晦澀的原生錯誤，不如在入口
 	///   就把原因講明。「尚未決定」同樣直接擲出、不代為觸發權限請求（那會在
@@ -63,6 +69,9 @@ public actor MicrophoneStreamer {
 		guard permission.isGranted else { throw MicrophoneStreamError.permissionDenied }
 		stop()
 		let runGeneration = claimGeneration()
+		// `.makeStream()` 不指定 bufferingPolicy 時預設 `.unbounded`——刻意的選擇，
+		// 非遺漏；取捨說明見上方 `start()` 文件註解，勿順手加 bufferingPolicy 限制
+		// 而改變此行為。
 		let (stream, continuation) = AsyncStream<(Data, UInt64)>.makeStream()
 		do {
 			try beginStreaming(preferredFormat: nil) { outputFormat in
