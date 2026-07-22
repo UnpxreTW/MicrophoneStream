@@ -218,4 +218,57 @@ private final class MicrophoneStreamerTests {
 		#expect(total > 0, "降取樣輸出不該為空")
 		#expect(total % 2 == 0, "Int16 輸出必須是整數個 frame")
 	}
+
+	/// generation token 是單調遞增的 run id：每輪 `start()` 經 `claimGeneration()`
+	/// 各自認領一個，`stop(generation:)` 用它判斷收尾請求是否已過期（見型別內文件）。
+	/// 這裡直接驗證計數本身的單調遞增與不重複——完整的並發競態場景（遲到的
+	/// `onTermination` 取消企圖拆掉已經在跑的新一輪）見下方設計筆記，本測試不含。
+	@Test
+	private func `claimGeneration increments monotonically and never repeats`() async {
+		let streamer = MicrophoneStreamer(
+			configuration: .default,
+			session: MockAudioSession(),
+			permission: MockMicrophonePermission(granted: true)
+		)
+		let first = await streamer.claimGeneration()
+		let second = await streamer.claimGeneration()
+		let third = await streamer.claimGeneration()
+		#expect(first < second)
+		#expect(second < third)
+		#expect(Set([first, second, third]).count == 3)
+	}
 }
+
+// MARK: - 設計筆記：generation token／onTermination 完整並發競態場景
+
+// 上面的測試涵蓋了 generation 計數本身的正確性（單調遞增、不重複），但沒有涵蓋
+// 型別文件描述的完整競態：「舊一輪的消費端取消晚到，透過 `onTermination` 誤拆掉
+// 剛啟動的新一輪」。這條路徑目前無法在不觸碰真實麥克風硬體的情況下決定性重現，
+// 原因是 `beginStreaming(preferredFormat:makeSink:)` 在 session 配置成功後會
+// 直接讀 `engine.inputNode.outputFormat(forBus:)`；`engine` 是具體的
+// `AVAudioEngine`、沒有像 `AudioSessionControlling` 那樣的協定接縫可注入假格式。
+// CI 環境若沒有可用的輸入裝置，這條路徑會在拿到 sample rate 前就以
+// `formatUnavailable` 短路，永遠走不到 `activeContinuation` 與 `onTermination`
+// 掛勾的那一步——本檔其餘測試也是因此才一律用 `MockAudioSession(configureError:)`
+// 讓流程停在 session 層、不繼續碰 engine。
+//
+// 這個限制也排除了一個表面上很誘人的捷徑：直接呼叫 `stop(generation:)` 帶一個
+// 過期的 generation、斷言 `MockAudioSession.deactivateCount` 仍是 0。這樣寫出的
+// 測試看起來驗證了「過期 generation 被擋下」，但其實驗證不了——`teardown()`
+// 本身有一道獨立的 idle guard（`producer != nil || engine.isRunning ||
+// sessionActive`），沒有真正 start 過的 streamer 呼叫 `stop(generation:)`
+// 不論帶哪個 generation 都會被這道 guard 擋掉、根本不會走到
+// `deactivateSession()`。也就是說，就算把 generation 比對整段拿掉，這樣的測試
+// 一樣會綠燈——它量不出 generation 保護機制本身有沒有作用，只是重複驗證了
+// idle guard。要讓這個斷言真正有鑑別力，必須先讓 session 真正進入 active 狀態
+// （即真正 start 成功過一次），這又繞回上一段的硬體依賴問題。
+//
+// 若之後要讓這條競態可決定性測試，需要先把 engine 的 input format／tap 安裝
+// 抽成類似 `AudioSessionControlling` 的協定接縫，測試才能在不碰硬體的前提下
+// 讓 `start()` 走到成功路徑、拿到真正的 `runGeneration`，再依序：
+//   1. 呼叫 `start()` 成功一次，記下第一輪的 `runGeneration`。
+//   2. 再次呼叫 `start()`（模擬新一輪開始），記下第二輪的 `runGeneration`。
+//   3. 手動用第一輪的 generation 呼叫 `stop(generation:)`，驗證第二輪的
+//      session／engine 狀態不受影響（no-op）。
+//   4. 用第二輪的 generation 呼叫 `stop(generation:)`，驗證這次才真正 teardown。
+// 這項重構不在本次最小處置範圍內，留待後續評估。
